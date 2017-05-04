@@ -8,7 +8,23 @@
 var util = require('util'),
   winston = require('winston'),
   kafka = require('kafka-node'),
-  Transport = winston.Transport;
+  fs = require('fs'),
+  Transport = winston.Transport
+
+var readSsl = function(sslOptions) {
+  try {
+    return {
+      keyPath: sslOptions.keyPath,
+      certPath: sslOptions.certPath,
+      caPath: sslOptions.rcaPath.join(','),
+      key: fs.readFileSync(sslOptions.keyPath),
+      cert: fs.readFileSync(sslOptions.certPath),
+      ca: sslOptions.rcaPath.map(fs.readFileSync),
+    };
+  } catch (e) {
+    throw new Error('Client Keys are required but not found: ' + e);
+  }
+};
 
 //
 // function Kafka (options)
@@ -23,6 +39,8 @@ var Kafka = exports.Kafka = function(options) {
   this.connectionString = options.connectionString || 'localhost:2181';
   this.clientId = options.clientId || 'winston-kafka-transport';
   this.zkOptions = options.zkOptions;
+  this.noAckBatchOptions = options.noAckBatchOptions;
+  this.sslOptions = options.sslOptions ? readSsl(options.sslOptions) : undefined;
   this.producerOptions = options.producerOptions;
 
   // Producer Props
@@ -31,7 +49,7 @@ var Kafka = exports.Kafka = function(options) {
   this.producerReady = false;
 
   // Construct Kafka client
-  this.client = new kafka.Client(this.connectionString, this.clientId, this.zkOptions);
+  this.client = new kafka.Client(this.connectionString, this.clientId, this.zkOptions, this.noAckBatchOptions, this.sslOptions);
 
   // Construct Producer
   this.producer = new kafka.HighLevelProducer(this.client, this.producerOptions);
